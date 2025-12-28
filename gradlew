@@ -6,7 +6,10 @@
 
 set -e
 
+# Get the script directory and change to the project root
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
 GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
 
 # Read properties
@@ -17,14 +20,18 @@ DISTRIBUTION_URL=$(grep "distributionUrl" "$PROPERTIES_FILE" | cut -d'=' -f2 | t
 GRADLE_VERSION=$(echo "$DISTRIBUTION_URL" | sed 's/.*gradle-\([0-9.]*\)-.*/\1/')
 DIST_DIR="$GRADLE_USER_HOME/wrapper/dists"
 
+# Determine the expected Gradle home directory
+GRADLE_DIR="$DIST_DIR/gradle-$GRADLE_VERSION"
+if [ ! -d "$GRADLE_DIR" ]; then
+    GRADLE_DIR="$DIST_DIR/gradle-$GRADLE_VERSION-bin"
+fi
+
 # Download if necessary
-DIST_FILE_PREFIX="gradle-$GRADLE_VERSION"
-GRADLE_DIR="$DIST_DIR/$DIST_FILE_PREFIX"
-if [ ! -d "$GRADLE_DIR/bin" ]; then
+if [ ! -f "$GRADLE_DIR/bin/gradle" ]; then
     echo "Downloading Gradle $GRADLE_VERSION..."
     mkdir -p "$DIST_DIR"
     cd "$DIST_DIR"
-    DIST_FILE="$DIST_FILE_PREFIX-bin.zip"
+    DIST_FILE="gradle-$GRADLE_VERSION-bin.zip"
     if [ ! -f "$DIST_FILE" ]; then
         curl -L -o "$DIST_FILE" "$DISTRIBUTION_URL"
     fi
@@ -32,13 +39,16 @@ if [ ! -d "$GRADLE_DIR/bin" ]; then
     if [ -f "$DIST_FILE" ]; then
         unzip -q "$DIST_FILE"
         # If extracted as gradle-X.Y.Z-bin, rename to gradle-X.Y.Z
-        if [ -d "$DIST_FILE_PREFIX-bin" ] && [ ! -d "$DIST_FILE_PREFIX" ]; then
-            mv "$DIST_FILE_PREFIX-bin" "$DIST_FILE_PREFIX"
+        if [ -d "gradle-$GRADLE_VERSION-bin" ] && [ ! -d "gradle-$GRADLE_VERSION" ]; then
+            mv "gradle-$GRADLE_VERSION-bin" "gradle-$GRADLE_VERSION"
         fi
         rm "$DIST_FILE"
     fi
+    # Return to project directory
+    cd "$SCRIPT_DIR"
+    # Update GRADLE_DIR to final location
+    GRADLE_DIR="$DIST_DIR/gradle-$GRADLE_VERSION"
 fi
 
 # Run Gradle
-GRADLE_HOME="$GRADLE_DIR"
-exec "$GRADLE_HOME/bin/gradle" "$@"
+exec "$GRADLE_DIR/bin/gradle" "$@"
